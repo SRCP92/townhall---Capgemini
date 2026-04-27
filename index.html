@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -7,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
 
 <!-- Firebase SDKs -->
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -377,13 +379,16 @@ h1{font-size:28px;font-weight:700;text-align:center;line-height:1.2;
 
 .empty{text-align:center;color:#6b7399;font-size:13px;padding:20px;font-style:italic}
 </style>
+
 </head>
 <body>
 
 <canvas id="stars"></canvas>
+
 <div id="toast"></div>
 
 <!-- Reset modal -->
+
 <div id="modal-reset">
   <div class="modal-box">
     <div style="font-size:36px;margin-bottom:12px">⚠️</div>
@@ -407,6 +412,7 @@ h1{font-size:28px;font-weight:700;text-align:center;line-height:1.2;
   </div>
 
   <!-- Tabs -->
+
   <div class="tabs">
     <button class="tab" id="tab-form"          onclick="showView('form')"          style="color:#00d4ff;background:rgba(0,212,255,0.15)">✦ Reconocer</button>
     <button class="tab" id="tab-constellation" onclick="showView('constellation')" style="color:#6b7399;background:transparent">✦ Constelación</button>
@@ -414,37 +420,42 @@ h1{font-size:28px;font-weight:700;text-align:center;line-height:1.2;
   </div>
 
   <!-- FORM VIEW -->
+
   <div id="view-form">
     <div class="card">
       <div class="card-title">Nuevo reconocimiento</div>
 
-      <div class="field">
-        <label>Tu nombre</label>
-        <input id="from-name" type="text" placeholder="Ej. Carlos" maxlength="40" oninput="checkForm()">
-      </div>
-      <div class="field">
-        <label>Nombre de tu compañero asignado</label>
-        <input id="to-name" type="text" placeholder="Ej. Rocío" maxlength="40" oninput="checkForm()">
-      </div>
 
-      <div class="field">
-        <label>Valor que más lo representa</label>
-        <div class="values-grid">
-          <button class="value-btn" id="vbtn-honestidad"      onclick="selectValue('honestidad')">      <span class="vdot" style="background:#ff6b9d"></span>Honestidad</button>
-          <button class="value-btn" id="vbtn-audacia"         onclick="selectValue('audacia')">         <span class="vdot" style="background:#ff8c42"></span>Audacia</button>
-          <button class="value-btn" id="vbtn-confianza"       onclick="selectValue('confianza')">       <span class="vdot" style="background:#7c6af7"></span>Confianza</button>
-          <button class="value-btn" id="vbtn-libertad"        onclick="selectValue('libertad')">        <span class="vdot" style="background:#00d4ff"></span>Libertad</button>
-          <button class="value-btn" id="vbtn-espiritu_equipo" onclick="selectValue('espiritu_equipo')"> <span class="vdot" style="background:#f26de8"></span>Espíritu de Equipo</button>
-          <button class="value-btn" id="vbtn-modestia"        onclick="selectValue('modestia')">        <span class="vdot" style="background:#6de8a0"></span>Modestia</button>
-          <button class="value-btn" id="vbtn-diversion"       onclick="selectValue('diversion')">       <span class="vdot" style="background:#ffd166"></span>Diversión</button>
-        </div>
-      </div>
+  <div class="field">
+    <label>Tu nombre</label>
+    <input id="from-name" type="text" placeholder="Ej. Carlos" maxlength="40" oninput="checkForm()">
+  </div>
+  <div class="field">
+    <label>Nombre de tu compañero asignado</label>
+    <input id="to-name" type="text" placeholder="Ej. Rocío" maxlength="40" oninput="checkForm()">
+  </div>
 
-      <button id="submit-btn" disabled onclick="handleSubmit()">Enviar reconocimiento ✦</button>
+  <div class="field">
+    <label>Valor que más lo representa</label>
+    <div class="values-grid">
+      <button class="value-btn" id="vbtn-honestidad"      onclick="selectValue('honestidad')">      <span class="vdot" style="background:#ff6b9d"></span>Honestidad</button>
+      <button class="value-btn" id="vbtn-audacia"         onclick="selectValue('audacia')">         <span class="vdot" style="background:#ff8c42"></span>Audacia</button>
+      <button class="value-btn" id="vbtn-confianza"       onclick="selectValue('confianza')">       <span class="vdot" style="background:#7c6af7"></span>Confianza</button>
+      <button class="value-btn" id="vbtn-libertad"        onclick="selectValue('libertad')">        <span class="vdot" style="background:#00d4ff"></span>Libertad</button>
+      <button class="value-btn" id="vbtn-espiritu_equipo" onclick="selectValue('espiritu_equipo')"> <span class="vdot" style="background:#f26de8"></span>Espíritu de Equipo</button>
+      <button class="value-btn" id="vbtn-modestia"        onclick="selectValue('modestia')">        <span class="vdot" style="background:#6de8a0"></span>Modestia</button>
+      <button class="value-btn" id="vbtn-diversion"       onclick="selectValue('diversion')">       <span class="vdot" style="background:#ffd166"></span>Diversión</button>
     </div>
   </div>
 
+  <button id="submit-btn" disabled onclick="handleSubmit()">Enviar reconocimiento ✦</button>
+</div>
+
+
+  </div>
+
   <!-- CONSTELLATION VIEW -->
+
   <div id="view-constellation" style="display:none">
     <div class="card" style="padding:16px">
       <div class="card-title" style="text-align:center">Constelación en vivo</div>
@@ -458,6 +469,7 @@ h1{font-size:28px;font-weight:700;text-align:center;line-height:1.2;
   </div>
 
   <!-- PODIUM VIEW -->
+
   <div id="view-podium" style="display:none">
     <div class="card">
       <div class="card-title" style="text-align:center">Ranking de valores</div>
@@ -472,20 +484,18 @@ h1{font-size:28px;font-weight:700;text-align:center;line-height:1.2;
 </div>
 
 <script>
-  // Update subtitle with live count from entries
-  const origOnSnapshot = window.__onSnapshot;
-  const observer = new MutationObserver(() => {});
-
-  // Update subtitle when feed updates
-  const feedEl = document.getElementById("feed");
-  const subtitleEl = document.getElementById("subtitle");
-  const feedObs = new MutationObserver(() => {
-    const chips = document.querySelectorAll(".chip").length;
-    subtitleEl.textContent = chips > 0
-      ? ${chips} reconocimiento${chips!==1?"s":""} en tiempo real
-      : "Conectando en tiempo real...";
+  var feedEl2 = document.getElementById("feed");
+  var subtitleEl2 = document.getElementById("subtitle");
+  var feedObs = new MutationObserver(function() {
+    var chips = document.querySelectorAll(".chip").length;
+    if (chips > 0) {
+      subtitleEl2.textContent = chips + " reconocimiento" + (chips !== 1 ? "s" : "") + " en tiempo real";
+    } else {
+      subtitleEl2.textContent = "Conectando en tiempo real...";
+    }
   });
-  feedObs.observe(feedEl, { childList: true });
+  feedObs.observe(feedEl2, { childList: true });
 </script>
+
 </body>
 </html>

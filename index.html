@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constelación de Valores · Capgemini</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCGdC8xktioB9gx1rdfkGWOOwfSa_5e5PQ",
+    authDomain: "townhall-capgemini.firebaseapp.com",
+    projectId: "townhall-capgemini",
+    storageBucket: "townhall-capgemini.firebasestorage.app",
+    messagingSenderId: "156365727180",
+    appId: "1:156365727180:web:8e8fcf049518639171e969"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const VALUES = [
+    { id: "honestidad",      label: "Honestidad",         color: "#ff6b9d", rgb: "255,107,157" },
+    { id: "audacia",         label: "Audacia",            color: "#ff8c42", rgb: "255,140,66"  },
+    { id: "confianza",       label: "Confianza",          color: "#7c6af7", rgb: "124,106,247" },
+    { id: "libertad",        label: "Libertad",           color: "#00d4ff", rgb: "0,212,255"   },
+    { id: "espiritu_equipo", label: "Espíritu de Equipo", color: "#f26de8", rgb: "242,109,232" },
+    { id: "modestia",        label: "Modestia",           color: "#6de8a0", rgb: "109,232,160" },
+    { id: "diversion",       label: "Diversión",          color: "#ffd166", rgb: "255,209,102" },
+  ];
+
+  let entries = [];
+  let selectedValue = null;
+  let nodes = [];
+  let rafId = null;
+
+  // ── Firebase listener (tiempo real) ──────────────────────────────
+  const q = query(collection(db, "reconocimientos"), orderBy("ts", "desc"));
+  onSnapshot(q, (snapshot) => {
+    entries = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderFeed();
+    renderPodium();
+    buildNodes();
+  });
+
+  // ── Submit ────────────────────────────────────────────────────────
+  window.handleSubmit = async () => {
+    const from = document.getElementById("from-name").value.trim();
+    const to   = document.getElementById("to-name").value.trim();
+    if (!from || !to || !selectedValue) return;
+
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true;
+    btn.textContent = "Enviando...";
+
+    await addDoc(collection(db, "reconocimientos"), { from, to, value: selectedValue, ts: Date.now() });
+
+    document.getElementById("from-name").value = "";
+    document.getElementById("to-name").value = "";
+    selectedValue = null;
+    document.querySelectorAll(".value-btn").forEach(b => b.classList.remove("selected"));
+    checkForm();
+    showToast("✦ ¡Reconocimiento enviado!");
+    showView("constellation");
+  };
+
+  // ── Reset ─────────────────────────────────────────────────────────
+  window.confirmReset = () => document.getElementById("modal-reset").style.display = "flex";
+  window.cancelReset  = () => document.getElementById("modal-reset").style.display = "none";
+  window.doReset = async () => {
+    const snap = await getDocs(collection(db, "reconocimientos"));
+    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+    document.getElementById("modal-reset").style.display = "none";
+    showToast("🗑 Datos reiniciados");
+  };
+
+  // ── UI helpers ────────────────────────────────────────────────────
+  window.checkForm = () => {
+    const ok = document.getElementById("from-name").value.trim() &&
+               document.getElementById("to-name").value.trim() && selectedValue;
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = !ok;
+    btn.textContent = "Enviar reconocimiento ✦";
+    btn.style.background = ok ? "linear-gradient(135deg,#00d4ff,#0099bb)" : "rgba(255,255,255,0.06)";
+    btn.style.color = ok ? "#04060f" : "#3a3f5a";
+  };
+
+  window.selectValue = (id) => {
+    selectedValue = id;
+    const v = VALUES.find(x => x.id === id);
+    document.querySelectorAll(".value-btn").forEach(b => {
+      b.classList.remove("selected");
+      b.style.borderColor = "rgba(255,255,255,0.07)";
+      b.style.background  = "rgba(255,255,255,0.03)";
+      b.style.color = "#6b7399";
+      b.style.boxShadow = "none";
+    });
+    const btn = document.getElementById("vbtn-" + id);
+    btn.classList.add("selected");
+    btn.style.borderColor = v.color;
+    btn.style.background  = rgba(${v.rgb},0.12);
+    btn.style.color = "#e8eaf6";
+    btn.style.boxShadow = 0 0 12px rgba(${v.rgb},0.18);
+    checkForm();
+  };
+
+  window.showView = (v) => {
+    ["form","constellation","podium"].forEach(id => {
+      document.getElementById("view-" + id).style.display = id === v ? "block" : "none";
+      const tab = document.getElementById("tab-" + id);
+      tab.style.color     = id === v ? "#00d4ff" : "#6b7399";
+      tab.style.background= id === v ? "rgba(0,212,255,0.15)" : "transparent";
+    });
+    if (v === "constellation") startConstellation();
+  };
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.transform = "translateX(-50%) translateY(0)";
+    setTimeout(() => t.style.transform = "translateX(-50%) translateY(-80px)", 2500);
+  }
+
+  // ── Feed ──────────────────────────────────────────────────────────
+  function renderFeed() {
+    const el = document.getElementById("feed");
+    if (!entries.length) { el.innerHTML = '<div class="empty">Sé el primero en enviar un reconocimiento</div>'; return; }
+    el.innerHTML = entries.slice(0, 20).map(e => {
+      const v = VALUES.find(x => x.id === e.value) || VALUES[0];
+      return `<div class="chip">
+        <span class="chip-from">${e.from}</span>
+        <span class="arrow">→</span>
+        <span class="chip-to">${e.to}</span>
+        <span class="chip-tag" style="background:rgba(${v.rgb},0.15);color:${v.color}">${v.label}</span>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Podium ────────────────────────────────────────────────────────
+  function renderPodium() {
+    const counts = {};
+    entries.forEach(e => { counts[e.value] = (counts[e.value] || 0) + 1; });
+    const sorted = VALUES.filter(v => counts[v.id]).sort((a,b) => counts[b.id] - counts[a.id]);
+    const max = sorted.length ? counts[sorted[0].id] : 1;
+    const medals = ["🥇","🥈","🥉"];
+    const el = document.getElementById("podium-list");
+
+    if (!sorted.length) { el.innerHTML = '<div class="empty">Aún no hay reconocimientos ✦</div>'; return; }
+
+    el.innerHTML = sorted.map((v, i) => `
+      <div class="podium-item" style="border-color:${i===0?v.color+"44":"rgba(255,255,255,0.07)"};background:${i===0?rgba(${v.rgb},0.08):"rgba(255,255,255,0.02)"}">
+        <span style="font-size:20px;width:28px;text-align:center">${medals[i] || (i+1)}</span>
+        <span style="width:10px;height:10px;border-radius:50%;background:${v.color};flex-shrink:0"></span>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:600">${v.label}</div>
+          <div style="font-size:12px;color:#6b7399">${counts[v.id]} reconocimiento${counts[v.id]>1?"s":""}</div>
+        </div>
+        <div style="width:60px;height:5px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden">
+          <div style="height:100%;border-radius:4px;background:${v.color};width:${(counts[v.id]/max)*100}%;transition:width 0.8s ease"></div>
+        </div>
+        <div style="font-size:18px;font-weight:700;color:${v.color};min-width:24px;text-align:right">${counts[v.id]}</div>
+      </div>`).join("");
+
+    document.getElementById("total-count").textContent = entries.length;
+    document.getElementById("total-box").style.display = entries.length ? "block" : "none";
+  }
+
+  // ── Constellation ─────────────────────────────────────────────────
+  function buildNodes() {
+    const canvas = document.getElementById("cnv");
+    if (!canvas) return;
+    const W = canvas.width, H = canvas.height;
+    const unique = [...new Set(entries.flatMap(e => [e.from, e.to]))];
+    const existing = new Map(nodes.map(n => [n.name, n]));
+    nodes = unique.map((name, i) => {
+      if (existing.has(name)) return existing.get(name);
+      const angle = (i / unique.length) * Math.PI * 2 - Math.PI / 2;
+      return {
+        name,
+        x: W/2 + Math.cos(angle) * W * (0.28 + Math.random()*0.16),
+        y: H/2 + Math.sin(angle) * H * (0.22 + Math.random()*0.12),
+        vx: (Math.random()-0.5)*0.25, vy: (Math.random()-0.5)*0.25,
+        phase: Math.random()*Math.PI*2,
+        r: 3.5 + Math.min(5, entries.filter(e=>e.to===name).length*1.2),
+      };
+    });
+  }
+
+  function startConstellation() {
+    const canvas = document.getElementById("cnv");
+    if (!canvas) return;
+    if (rafId) cancelAnimationFrame(rafId);
+    canvas.width  = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight || 260;
+    buildNodes();
+    const ctx = canvas.getContext("2d");
+
+    function draw(t) {
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+
+      if (!nodes.length) {
+        ctx.fillStyle = "rgba(107,115,153,0.45)";
+        ctx.font = "13px Outfit, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Los reconocimientos aparecerán aquí ✦", W/2, H/2);
+        rafId = requestAnimationFrame(draw);
+        return;
+      }
+
+      nodes.forEach(n => {
+        n.x += n.vx; n.y += n.vy;
+        if (n.x < 28 || n.x > W-28) n.vx *= -1;
+        if (n.y < 18 || n.y > H-28) n.vy *= -1;
+      });
+
+      entries.forEach((e, idx) => {
+        const fn = nodes.find(n=>n.name===e.from);
+        const tn = nodes.find(n=>n.name===e.to);
+        const v  = VALUES.find(v=>v.id===e.value);
+        if (!fn||!tn||!v) return;
+        ctx.beginPath(); ctx.moveTo(fn.x,fn.y); ctx.lineTo(tn.x,tn.y);
+        ctx.strokeStyle = v.color+"44"; ctx.lineWidth=1.3; ctx.stroke();
+        const prog = (t*0.00028 + idx*0.17) % 1;
+        ctx.beginPath();
+        ctx.arc(fn.x+(tn.x-fn.x)*prog, fn.y+(tn.y-fn.y)*prog, 2.8, 0, Math.PI*2);
+        ctx.fillStyle = v.color; ctx.fill();
+      });
+
+      nodes.forEach(n => {
+        const r = n.r * (1 + 0.14*Math.sin(t*0.0018+n.phase));
+        const g = ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r*3.5);
+        g.addColorStop(0,"rgba(255,255,255,0.22)"); g.addColorStop(1,"rgba(255,255,255,0)");
+        ctx.beginPath(); ctx.arc(n.x,n.y,r*3.5,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+        ctx.beginPath(); ctx.arc(n.x,n.y,r,0,Math.PI*2); ctx.fillStyle="#fff"; ctx.fill();
+        ctx.fillStyle="rgba(232,234,246,0.82)";
+        ctx.font="10px Outfit,sans-serif"; ctx.textAlign="center";
+        ctx.fillText(n.name, n.x, n.y+r+13);
+      });
+
+      rafId = requestAnimationFrame(draw);
+    }
+    rafId = requestAnimationFrame(draw);
+  }
+
+  // ── Stars ─────────────────────────────────────────────────────────
+  (() => {
+    const c = document.getElementById("stars");
+    const ctx = c.getContext("2d");
+    const stars = Array.from({length:140}, () => ({
+      x: Math.random(), y: Math.random(),
+      r: Math.random()*1.2+0.2,
+      phase: Math.random()*Math.PI*2,
+      speed: Math.random()*0.003+0.001
+    }));
+    function resize() { c.width=window.innerWidth; c.height=window.innerHeight; }
+    resize(); window.addEventListener("resize", resize);
+    function draw(t) {
+      ctx.clearRect(0,0,c.width,c.height);
+      stars.forEach(s => {
+        const a = 0.15 + 0.6*(0.5+0.5*Math.sin(t*s.speed+s.phase));
+        ctx.beginPath(); ctx.arc(s.x*c.width,s.y*c.height,s.r,0,Math.PI*2);
+        ctx.fillStyle=rgba(200,215,255,${a}); ctx.fill();
+      });
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#04060f;color:#e8eaf6;
+  font-family:'Outfit',sans-serif;min-height:100vh;overflow-x:hidden;
+}
+#stars{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:460px;margin:0 auto;padding:20px 16px 60px}
+
+/* Toast */
+#toast{
+  position:fixed;top:20px;left:50%;z-index:99;
+  transform:translateX(-50%) translateY(-80px);
+  transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  background:#0d1f0d;border:1px solid #2a5a2a;color:#6de8a0;
+  padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;white-space:nowrap;
+}
+
+/* Header */
+.logo{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:#6b7399;margin-bottom:6px;text-align:center}
+h1{font-size:28px;font-weight:700;text-align:center;line-height:1.2;
+  background:linear-gradient(135deg,#fff 0%,#00d4ff 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{color:#6b7399;font-size:13px;margin-top:6px;text-align:center;font-weight:300;margin-bottom:24px}
+
+/* Tabs */
+.tabs{display:flex;gap:6px;background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:5px;margin-bottom:20px}
+.tab{flex:1;padding:9px 4px;border-radius:10px;border:none;
+  font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;
+  letter-spacing:0.3px;cursor:pointer;transition:all 0.2s}
+
+/* Card */
+.card{background:#0b0f1e;border:1px solid rgba(255,255,255,0.07);border-radius:20px;padding:22px;margin-bottom:16px}
+.card-title{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#6b7399;margin-bottom:18px}
+
+/* Inputs */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:#6b7399;margin-bottom:6px}
+.field input{width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;padding:11px 14px;color:#e8eaf6;font-family:'Outfit',sans-serif;
+  font-size:15px;outline:none}
+.field input:focus{border-color:rgba(0,212,255,0.4)}
+.field input::placeholder{color:#6b7399}
+
+/* Value buttons */
+.values-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+.value-btn{
+  background:rgba(255,255,255,0.03);border:1.5px solid rgba(255,255,255,0.07);
+  border-radius:12px;padding:10px 12px;color:#6b7399;
+  font-family:'Outfit',sans-serif;font-size:13px;font-weight:500;
+  cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;
+  transition:all 0.18s;
+}
+.vdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* Submit */
+#submit-btn{
+  width:100%;border:none;border-radius:12px;padding:14px;
+  font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;
+  letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;
+  background:rgba(255,255,255,0.06);color:#3a3f5a;
+}
+#submit-btn:disabled{cursor:not-allowed}
+
+/* Constellation canvas */
+#cnv{width:100%;height:260px;display:block;border-radius:14px;border:1px solid rgba(255,255,255,0.07)}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;justify-content:center}
+.legend-chip{display:flex;align-items:center;gap:5px;border-radius:8px;padding:4px 10px;font-size:11px}
+
+/* Feed */
+.feed{display:flex;flex-direction:column;gap:7px;max-height:200px;overflow-y:auto}
+.chip{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:9px 12px;font-size:13px}
+.chip-from{color:#6b7399}.arrow{color:#3a3f5a;font-size:10px}
+.chip-to{font-weight:600}
+.chip-tag{margin-left:auto;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px}
+
+/* Podium */
+.podium-item{display:flex;align-items:center;gap:12px;border:1px solid;
+  border-radius:14px;padding:13px 16px;margin-bottom:10px}
+
+/* Total box */
+#total-box{margin-top:20px;text-align:center;padding:14px;
+  background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.15);border-radius:12px}
+
+/* Reset btn */
+.reset-btn{width:100%;margin-top:14px;padding:11px;
+  background:rgba(255,60,60,0.07);border:1px solid rgba(255,60,60,0.2);
+  border-radius:12px;color:#ff6b6b;font-family:'Outfit',sans-serif;
+  font-size:13px;font-weight:600;cursor:pointer}
+
+/* Modal */
+#modal-reset{display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(4,6,15,0.85);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;padding:24px}
+.modal-box{background:#0b0f1e;border:1px solid rgba(255,80,80,0.3);
+  border-radius:20px;padding:28px;max-width:340px;width:100%;text-align:center}
+.modal-btns{display:flex;gap:10px;margin-top:20px}
+.modal-btns button{flex:1;padding:12px;border-radius:12px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+
+.empty{text-align:center;color:#6b7399;font-size:13px;padding:20px;font-style:italic}
+</style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+<div id="toast"></div>
+
+<!-- Reset modal -->
+<div id="modal-reset">
+  <div class="modal-box">
+    <div style="font-size:36px;margin-bottom:12px">⚠️</div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:8px">¿Reiniciar todo?</div>
+    <div style="font-size:13px;color:#6b7399;line-height:1.5">
+      Esto borrará <strong style="color:#e8eaf6">todos los reconocimientos</strong> para todos los participantes. No se puede deshacer.
+    </div>
+    <div class="modal-btns">
+      <button onclick="cancelReset()" style="border:1px solid rgba(255,255,255,0.1);background:transparent;color:#6b7399">Cancelar</button>
+      <button onclick="doReset()" style="border:none;background:linear-gradient(135deg,#ff4444,#cc2222);color:#fff">Sí, reiniciar</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- Header -->
+  <div style="padding-top:8px;margin-bottom:20px">
+    <div class="logo">Capgemini · Townhall</div>
+    <h1>Constelación<br>de Valores</h1>
+    <p class="subtitle" id="subtitle">Conectando en tiempo real...</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab" id="tab-form"          onclick="showView('form')"          style="color:#00d4ff;background:rgba(0,212,255,0.15)">✦ Reconocer</button>
+    <button class="tab" id="tab-constellation" onclick="showView('constellation')" style="color:#6b7399;background:transparent">✦ Constelación</button>
+    <button class="tab" id="tab-podium"        onclick="showView('podium')"        style="color:#6b7399;background:transparent">✦ Podio</button>
+  </div>
+
+  <!-- FORM VIEW -->
+  <div id="view-form">
+    <div class="card">
+      <div class="card-title">Nuevo reconocimiento</div>
+
+      <div class="field">
+        <label>Tu nombre</label>
+        <input id="from-name" type="text" placeholder="Ej. Carlos" maxlength="40" oninput="checkForm()">
+      </div>
+      <div class="field">
+        <label>Nombre de tu compañero asignado</label>
+        <input id="to-name" type="text" placeholder="Ej. Rocío" maxlength="40" oninput="checkForm()">
+      </div>
+
+      <div class="field">
+        <label>Valor que más lo representa</label>
+        <div class="values-grid">
+          <button class="value-btn" id="vbtn-honestidad"      onclick="selectValue('honestidad')">      <span class="vdot" style="background:#ff6b9d"></span>Honestidad</button>
+          <button class="value-btn" id="vbtn-audacia"         onclick="selectValue('audacia')">         <span class="vdot" style="background:#ff8c42"></span>Audacia</button>
+          <button class="value-btn" id="vbtn-confianza"       onclick="selectValue('confianza')">       <span class="vdot" style="background:#7c6af7"></span>Confianza</button>
+          <button class="value-btn" id="vbtn-libertad"        onclick="selectValue('libertad')">        <span class="vdot" style="background:#00d4ff"></span>Libertad</button>
+          <button class="value-btn" id="vbtn-espiritu_equipo" onclick="selectValue('espiritu_equipo')"> <span class="vdot" style="background:#f26de8"></span>Espíritu de Equipo</button>
+          <button class="value-btn" id="vbtn-modestia"        onclick="selectValue('modestia')">        <span class="vdot" style="background:#6de8a0"></span>Modestia</button>
+          <button class="value-btn" id="vbtn-diversion"       onclick="selectValue('diversion')">       <span class="vdot" style="background:#ffd166"></span>Diversión</button>
+        </div>
+      </div>
+
+      <button id="submit-btn" disabled onclick="handleSubmit()">Enviar reconocimiento ✦</button>
+    </div>
+  </div>
+
+  <!-- CONSTELLATION VIEW -->
+  <div id="view-constellation" style="display:none">
+    <div class="card" style="padding:16px">
+      <div class="card-title" style="text-align:center">Constelación en vivo</div>
+      <canvas id="cnv"></canvas>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Reconocimientos recientes</div>
+      <div class="feed" id="feed"><div class="empty">Sé el primero en enviar un reconocimiento</div></div>
+    </div>
+  </div>
+
+  <!-- PODIUM VIEW -->
+  <div id="view-podium" style="display:none">
+    <div class="card">
+      <div class="card-title" style="text-align:center">Ranking de valores</div>
+      <div id="podium-list"><div class="empty">Aún no hay reconocimientos ✦</div></div>
+      <div id="total-box" style="display:none">
+        <div style="font-size:28px;font-weight:700;color:#00d4ff" id="total-count">0</div>
+        <div style="font-size:12px;color:#6b7399;margin-top:2px">reconocimientos totales</div>
+      </div>
+      <button class="reset-btn" onclick="confirmReset()">🗑 Reiniciar todos los datos</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Update subtitle with live count from entries
+  const origOnSnapshot = window.__onSnapshot;
+  const observer = new MutationObserver(() => {});
+
+  // Update subtitle when feed updates
+  const feedEl = document.getElementById("feed");
+  const subtitleEl = document.getElementById("subtitle");
+  const feedObs = new MutationObserver(() => {
+    const chips = document.querySelectorAll(".chip").length;
+    subtitleEl.textContent = chips > 0
+      ? ${chips} reconocimiento${chips!==1?"s":""} en tiempo real
+      : "Conectando en tiempo real...";
+  });
+  feedObs.observe(feedEl, { childList: true });
+</script>
+</body>
+</html>

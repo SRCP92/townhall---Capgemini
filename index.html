@@ -104,9 +104,9 @@
     const btn = document.getElementById("vbtn-" + id);
     btn.classList.add("selected");
     btn.style.borderColor = v.color;
-    btn.style.background  = rgba(${v.rgb},0.12);
+    btn.style.background  = "rgba(" + v.rgb + ",0.12)";
     btn.style.color = "#e8eaf6";
-    btn.style.boxShadow = 0 0 12px rgba(${v.rgb},0.18);
+    btn.style.boxShadow = "0 0 12px rgba(" + v.rgb + ",0.18)";
     checkForm();
   };
 
